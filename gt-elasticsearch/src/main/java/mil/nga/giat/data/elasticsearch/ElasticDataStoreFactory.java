@@ -68,7 +68,7 @@ public class ElasticDataStoreFactory implements DataStoreFactorySpi {
             SSL_ENABLED,
             SSL_REJECT_UNAUTHORIZED,
             INDEX_NAME,
-            DEFAULT_MAX_FEATURES,
+            DEFAULT_MAX_FEATURES,            
             SOURCE_FILTERING_ENABLED,
             SCROLL_ENABLED,
             SCROLL_SIZE,
@@ -126,16 +126,15 @@ public class ElasticDataStoreFactory implements DataStoreFactorySpi {
 
     @Override
     public DataStore createDataStore(Map<String, Serializable> params) throws IOException {
-        final String searchHost = (String) getValue(HOSTNAME, params);
-        final Integer hostPort = (Integer) getValue(HOSTPORT, params);
+        final String searchHost = getValue(HOSTNAME, params);
+        final Integer hostPort = getValue(HOSTPORT, params);
         final String indexName = (String) INDEX_NAME.lookUp(params);
-        final String arrayEncoding = (String) getValue(ARRAY_ENCODING, params);
-        final Boolean sslEnabled = (Boolean) getValue(SSL_ENABLED, params);
-        final Boolean sslRejectUnauthorized = (Boolean) getValue(SSL_REJECT_UNAUTHORIZED, params);
-
+        final String arrayEncoding = getValue(ARRAY_ENCODING, params);
+        final Boolean sslEnabled = getValue(SSL_ENABLED, params);
+        final Boolean sslRejectUnauthorized = getValue(SSL_REJECT_UNAUTHORIZED, params);
+        
         final String scheme = sslEnabled ? "https" : "http";
         final RestClientBuilder builder = RestClient.builder(new HttpHost(searchHost, hostPort, scheme));
-
         if (sslEnabled) {
             builder.setHttpClientConfigCallback(new RestClientBuilder.HttpClientConfigCallback() {
                 @Override
@@ -155,11 +154,12 @@ public class ElasticDataStoreFactory implements DataStoreFactorySpi {
         }
 
         final ElasticDataStore dataStore = new ElasticDataStore(builder.build(), indexName);
-        dataStore.setDefaultMaxFeatures((Integer) getValue(DEFAULT_MAX_FEATURES, params));
-        dataStore.setSourceFilteringEnabled((Boolean) getValue(SOURCE_FILTERING_ENABLED, params));
-        dataStore.setScrollEnabled((Boolean)getValue(SCROLL_ENABLED, params));
+       
+        dataStore.setDefaultMaxFeatures(getValue(DEFAULT_MAX_FEATURES, params));
+        dataStore.setSourceFilteringEnabled(getValue(SOURCE_FILTERING_ENABLED, params));
+        dataStore.setScrollEnabled(getValue(SCROLL_ENABLED, params));
         dataStore.setScrollSize(((Number)getValue(SCROLL_SIZE, params)).longValue());
-        dataStore.setScrollTime((Integer)getValue(SCROLL_TIME_SECONDS, params));
+        dataStore.setScrollTime(getValue(SCROLL_TIME_SECONDS, params));
         dataStore.setArrayEncoding(ArrayEncoding.valueOf(arrayEncoding.toUpperCase()));
         dataStore.setGridSize((Long) GRID_SIZE.lookUp(params));
         dataStore.setGridThreshold((Double) GRID_THRESHOLD.lookUp(params));
@@ -171,14 +171,14 @@ public class ElasticDataStoreFactory implements DataStoreFactorySpi {
         return null;
     }
 
-    private Object getValue(Param param, Map<String, Serializable> params) throws IOException {
+    @SuppressWarnings({ "javadoc", "unchecked" })
+	protected static <T> T getValue(Param param, Map<String, Serializable> params) throws IOException {
         final Object value;
         if (param.lookUp(params) != null) {
             value = param.lookUp(params);
         } else {
             value = param.sample;
         }
-        return value;
+        return (T) value;
     }
-
 }

@@ -12,7 +12,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -44,7 +43,7 @@ public class ElasticDataStore extends ContentDataStore {
     private final static Logger LOGGER = Logging.getLogger(ElasticDataStore.class);
 
     private ElasticClient client;
-
+   
     private final String indexName;
 
     private final List<Name> baseTypeNames;
@@ -63,7 +62,7 @@ public class ElasticDataStore extends ContentDataStore {
 
     private Integer scrollTime;
 
-    private ArrayEncoding arrayEncoding;
+    protected ArrayEncoding arrayEncoding;
 
     private Long gridSize;
 
@@ -80,29 +79,32 @@ public class ElasticDataStore extends ContentDataStore {
          * URL encode and join string array elements.
          */
         CSV
-
     }
 
-    public ElasticDataStore(String searchHost, Integer hostPort,  String indexName) throws IOException {
-        this(RestClient.builder(new HttpHost(searchHost, hostPort, "http")).build(), indexName);
+    public ElasticDataStore(String searchHost, Integer hostPort,  String indexName) throws IOException {   	
+       this(RestClient.builder(new HttpHost(searchHost, hostPort, "http")).build(), indexName);
     }
 
     public ElasticDataStore(RestClient restClient, String indexName) throws IOException {
+        this(restClient, null, indexName);
+    }
+   
+    public ElasticDataStore(RestClient adminRestClient, RestClient proxyRestClient, String indexName) throws IOException {
         LOGGER.fine("Initializing data store for " + indexName);
 
         this.indexName = indexName;
 
         try {
-            final Response response = restClient.performRequest("GET", "/", Collections.<String, String>emptyMap());
+            final Response response = adminRestClient.performRequest("GET", "/", Collections.<String, String>emptyMap());
             if (response.getStatusLine().getStatusCode() >= 400) {
                 throw new IOException();
             }
-            client = new RestElasticClient(restClient);
+            client = new RestElasticClient(adminRestClient, proxyRestClient);           
         } catch (Exception e) {
             throw new IOException("Unable to create REST client", e);
         }
-        LOGGER.fine("Created REST client: " + client);
-
+        LOGGER.fine("Created REST client: " + client);        
+        
         final List<String> types = getClient().getTypes(indexName);
         if (!types.isEmpty()) {
             baseTypeNames = types.stream().map(name -> new NameImpl(name)).collect(Collectors.toList());
@@ -115,7 +117,7 @@ public class ElasticDataStore extends ContentDataStore {
 
         arrayEncoding = ArrayEncoding.JSON;
     }
-
+    
     @Override
     protected List<Name> createTypeNames() {
         final List<Name> names = new ArrayList<>();
@@ -145,66 +147,56 @@ public class ElasticDataStore extends ContentDataStore {
 
     public List<ElasticAttribute> getElasticAttributes(Name layerName) throws IOException {
         final String localPart = layerName.getLocalPart();
-        final String docType;
-        if (docTypes.containsKey(layerName)) {
-            docType = docTypes.get(layerName);
-        } else {
-            docType = localPart;
-        }
-
-        final Map<String,Object> mapping = getClient().getMapping(indexName, docType);
-        final List<ElasticAttribute> elasticAttributes = new ArrayList<ElasticAttribute>();
-        if (mapping != null) {
-            add(elasticAttributes, "_id", "string", mapping, false);
-            add(elasticAttributes, "_index", "string", mapping, false);
-            add(elasticAttributes, "_type", "string", mapping, false);
-            add(elasticAttributes, "_score", "float", mapping, false);
-            add(elasticAttributes, "_relative_score", "float", mapping, false);
-            add(elasticAttributes, "_aggregation", "binary", mapping, false);
-
-            walk(elasticAttributes, mapping, "", false, false);
-
-            // add default geometry and short name and count duplicate short names
-            final Map<String,Integer> counts = new HashMap<>();
-            boolean foundGeometry = false;
-            for (final ElasticAttribute attribute : elasticAttributes) {
-                if (!foundGeometry && Geometry.class.isAssignableFrom(attribute.getType())) {
-                    attribute.setDefaultGeometry(true);
-                    foundGeometry = true;
-                }
-                final String[] parts = attribute.getName().split("\\.");
-                attribute.setShortName(parts[parts.length-1]);
-                final int count;
-                if (counts.containsKey(attribute.getShortName())) {
-                    count = counts.get(attribute.getShortName())+1;
-                } else {
-                    count = 1;
-                }
-                counts.put(attribute.getShortName(), count);
-            }
-            // use full name if short name has duplicates
-            for (final ElasticAttribute attribute : elasticAttributes) {
-                if (counts.get(attribute.getShortName()) > 1) {
-                    attribute.setShortName(attribute.getName());
-                }
-            }
-        }
-
         final ElasticLayerConfiguration layerConfig = layerConfigurations.get(localPart);
-        if (layerConfig != null && !layerConfig.getAttributes().isEmpty()) {
-            final Map<String, ElasticAttribute> names = layerConfig.getAttributes().stream()
-                    .collect(Collectors.toMap(ElasticAttribute::getName, Function.identity()));
-
-            for (final ElasticAttribute attribute : elasticAttributes) {
-                if (!names.containsKey(attribute.getName())) {
-                    attribute.setUse(false);
-                    layerConfig.getAttributes().add(attribute);
-                }
+        final List<ElasticAttribute> elasticAttributes;
+        if (layerConfig == null || layerConfig.getAttributes().isEmpty()) {
+            final String docType;
+            if (docTypes.containsKey(layerName)) {
+                docType = docTypes.get(layerName);
+            } else {
+                docType = localPart;
             }
 
-            return layerConfig.getAttributes();
-        }
+            final Map<String,Object> mapping = getClient().getMapping(indexName, docType);
+            elasticAttributes = new ArrayList<ElasticAttribute>();
+            if (mapping != null) {
+                add(elasticAttributes, "_id", "string", mapping, false);
+                add(elasticAttributes, "_index", "string", mapping, false);
+                add(elasticAttributes, "_type", "string", mapping, false);
+                add(elasticAttributes, "_score", "float", mapping, false);
+                add(elasticAttributes, "_relative_score", "float", mapping, false);
+                add(elasticAttributes, "_aggregation", "binary", mapping, false);
 
+                walk(elasticAttributes, mapping, "", false, false);
+
+                // add default geometry and short name and count duplicate short names
+                final Map<String,Integer> counts = new HashMap<>();
+                boolean foundGeometry = false;
+                for (final ElasticAttribute attribute : elasticAttributes) {
+                    if (!foundGeometry && Geometry.class.isAssignableFrom(attribute.getType())) {
+                        attribute.setDefaultGeometry(true);
+                        foundGeometry = true;
+                    }
+                    final String[] parts = attribute.getName().split("\\.");
+                    attribute.setShortName(parts[parts.length-1]);
+                    final int count;
+                    if (counts.containsKey(attribute.getShortName())) {
+                        count = counts.get(attribute.getShortName())+1;
+                    } else {
+                        count = 1;
+                    }
+                    counts.put(attribute.getShortName(), count);
+                }
+                // use full name if short name has duplicates
+                for (final ElasticAttribute attribute : elasticAttributes) {
+                    if (counts.get(attribute.getShortName()) > 1) {
+                        attribute.setShortName(attribute.getName());
+                    }
+                }
+            }
+        } else {
+            elasticAttributes = layerConfig.getAttributes();
+        }
         return elasticAttributes;
     }
 

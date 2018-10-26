@@ -12,7 +12,9 @@ import java.util.Set;
 
 public interface ElasticClient extends Closeable {
 
-    public double getVersion();
+    static final String RUN_AS = "es-security-runas-user";
+	
+    public int getMajorVersion();
 
     public List<String> getTypes(String indexName) throws IOException;
 

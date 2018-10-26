@@ -957,7 +957,12 @@ public class FilterToElastic implements FilterVisitor, ExpressionVisitor {
 
         String encodedField; 
         if ( attType != null ) {
-            encodedField = attType.getLocalName();
+        	Map<Object, Object> userData = attType.getUserData();
+        	if( userData != null && userData.containsKey("full_name") ) {
+        		encodedField = userData.get("full_name").toString();
+        	} else {
+        		encodedField = attType.getLocalName();
+        	}
             if(target != null && target.isAssignableFrom(attType.getType().getBinding())) {
                 // no need for casting, it's already the right type
                 target = null;
