@@ -76,7 +76,6 @@ public class RestElasticClient implements ElasticClient {
         if (this.majorVersion != null) {
             return this.majorVersion;
         }
-
         final Pattern pattern = Pattern.compile("(\\d+)\\.\\d+\\.\\d+");
         try {
             final Response response = performRequest("GET", "/", null, this.adminClient);
@@ -197,8 +196,11 @@ public class RestElasticClient implements ElasticClient {
         if (LOGGER.isLoggable(Level.FINE)) {
             LOGGER.fine("Elasticsearch request:\n" + this.mapper.writerWithDefaultPrettyPrinter().writeValueAsString(requestBody));
         }
-        return parseResponse(performRequest("POST", pathBuilder.toString(), requestBody, this.proxyClient));
-       
+        
+        if (this.proxyClient != null) {
+        	return parseResponse(performRequest("POST", pathBuilder.toString(), requestBody, this.proxyClient));	
+        }
+        return parseResponse(performRequest("POST", pathBuilder.toString(), requestBody, this.adminClient));      
     }
    
     Response performRequest(String method, String path, Map<String,Object> requestBody, 
@@ -213,18 +215,22 @@ public class RestElasticClient implements ElasticClient {
         }
         
         Header proxy = null;
+        Response response = null;
 		if (rc == this.proxyClient) {
 			SecurityContext ctx = SecurityContextHolder.getContext();
 			Authentication auth = ctx.getAuthentication();
+			if (auth == null)
+				throw new IllegalStateException(String.format("Authentication could not be determined!"));
 			if (!auth.isAuthenticated())
 				throw new IllegalStateException(String.format("User is not authenticated: %s", auth.getName()));
 
 			proxy = new BasicHeader(RUN_AS, auth.getName());
 			LOGGER.fine("Performing proxy request for: " + auth.getName());
-		} else
+			response = rc.performRequest(method, path, Collections.<String, String> emptyMap(), entity, proxy);
+		} else {
 			LOGGER.fine("Performing admin request.");
-
-		Response response = rc.performRequest(method, path, Collections.<String, String> emptyMap(), entity, proxy);
+			response = rc.performRequest(method, path, Collections.<String, String> emptyMap(), entity);
+		}	
 		if (response.getStatusLine().getStatusCode() >= 400)
 			throw new IOException("Error executing request: " + response.getStatusLine().getReasonPhrase());
 
@@ -245,8 +251,10 @@ public class RestElasticClient implements ElasticClient {
         final Map<String,Object> requestBody = new HashMap<>();
         requestBody.put("scroll_id", scrollId);
         requestBody.put("scroll", scrollTime + "s");
-
-        return parseResponse(performRequest("POST", path, requestBody, this.proxyClient));
+        if (this.proxyClient != null) {
+        	return parseResponse(performRequest("POST", path, requestBody, this.proxyClient));
+        }
+        return parseResponse(performRequest("POST", path, requestBody, this.adminClient));
     }
 
     @Override
@@ -255,8 +263,11 @@ public class RestElasticClient implements ElasticClient {
         if (!scrollIds.isEmpty()) {
             final Map<String,Object> requestBody = new HashMap<>();
             requestBody.put("scroll_id", scrollIds);
-
-            performRequest("DELETE", path, requestBody, this.proxyClient);
+            if (this.proxyClient != null) {
+            	performRequest("DELETE", path, requestBody, this.proxyClient);
+            } else {
+            	performRequest("DELETE", path, requestBody, this.adminClient);
+            }
         }
     }
 
