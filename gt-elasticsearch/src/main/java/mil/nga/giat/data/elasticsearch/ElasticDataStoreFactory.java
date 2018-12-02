@@ -22,6 +22,8 @@ import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Data store factory that creates {@linkplain ElasticDataStore} instances.
@@ -29,17 +31,19 @@ import java.util.Map;
  */
 public class ElasticDataStoreFactory implements DataStoreFactorySpi {
 
-    /** Cluster hostname. **/
-    public static final Param HOSTNAME = new Param("elasticsearch_host", String.class, "Elasticsearch host", false, "localhost");
+    /** Cluster hostnames. **/
+    public static final Param HOSTNAME = new Param("elasticsearch_host", String.class,
+            "Host(s) with optional HTTP scheme and port.", false, "localhost");
 
     /** Cluster client port. **/
     public static final Param HOSTPORT = new Param("elasticsearch_port", Integer.class, 
-            "Elasticsearch HTTP port", false, 9200);
+            "Default HTTP port. Ignored if the host includes the port.", false, 9200);
 
-    public static final Param SSL_ENABLED = new Param("ssl_enabled", Boolean.class, "Enable SSL. Use system properties to configure SSL. For example \"javax.net.ssl.trustStore\", "
-            + "\"javax.net.ssl.trustStorePassword\", etc..", false, false);
+    public static final Param SSL_ENABLED = new Param("ssl_enabled", Boolean.class,
+            "Use https instead of http scheme. Ignored if the host includes the HTTP scheme.", false, false);
 
-    public static final Param SSL_REJECT_UNAUTHORIZED = new Param("ssl_reject_unauthorized", Boolean.class, "Whether to validate server certificate (ignored if ssl_enabled=false)", false, false);
+    public static final Param SSL_REJECT_UNAUTHORIZED = new Param("ssl_reject_unauthorized", Boolean.class,
+            "Whether to validate the server certificate during the SSL handshake for https connections", false, false);
 
     /** Index name. **/
     public static final Param INDEX_NAME = new Param("index_name", String.class, "Index defining type (supports wildcard)", true);
@@ -68,7 +72,7 @@ public class ElasticDataStoreFactory implements DataStoreFactorySpi {
             SSL_ENABLED,
             SSL_REJECT_UNAUTHORIZED,
             INDEX_NAME,
-            DEFAULT_MAX_FEATURES,            
+            DEFAULT_MAX_FEATURES,
             SOURCE_FILTERING_ENABLED,
             SCROLL_ENABLED,
             SCROLL_SIZE,
@@ -126,15 +130,45 @@ public class ElasticDataStoreFactory implements DataStoreFactorySpi {
 
     @Override
     public DataStore createDataStore(Map<String, Serializable> params) throws IOException {
-        final String searchHost = getValue(HOSTNAME, params);
-        final Integer hostPort = getValue(HOSTPORT, params);
         final String indexName = (String) INDEX_NAME.lookUp(params);
         final String arrayEncoding = getValue(ARRAY_ENCODING, params);
-        final Boolean sslEnabled = getValue(SSL_ENABLED, params);
+
+        final ElasticDataStore dataStore = new ElasticDataStore(createRestClient(params), indexName);
+        dataStore.setDefaultMaxFeatures(getValue(DEFAULT_MAX_FEATURES, params));
+        dataStore.setSourceFilteringEnabled(getValue(SOURCE_FILTERING_ENABLED, params));
+        dataStore.setScrollEnabled(getValue(SCROLL_ENABLED, params));
+        dataStore.setScrollSize(((Number)getValue(SCROLL_SIZE, params)).longValue());
+        dataStore.setScrollTime(getValue(SCROLL_TIME_SECONDS, params));
+        dataStore.setArrayEncoding(ArrayEncoding.valueOf(arrayEncoding.toUpperCase()));
+        dataStore.setGridSize((Long) GRID_SIZE.lookUp(params));
+        dataStore.setGridThreshold((Double) GRID_THRESHOLD.lookUp(params));
+        return dataStore;
+    }
+
+    protected RestClient createRestClient(Map<String, Serializable> params) throws IOException {
+        final String[] hosts = (getValue(HOSTNAME, params)).split(",");
+        final Integer defaultPort = getValue(HOSTPORT, params);
+        Boolean sslEnabled = getValue(SSL_ENABLED, params);
         final Boolean sslRejectUnauthorized = getValue(SSL_REJECT_UNAUTHORIZED, params);
-        
-        final String scheme = sslEnabled ? "https" : "http";
-        final RestClientBuilder builder = RestClient.builder(new HttpHost(searchHost, hostPort, scheme));
+
+        final String defaultScheme = sslEnabled ? "https" : "http";
+        final Pattern pattern = Pattern.compile("(?<scheme>https?)?(://)?(?<host>[^:]+):?(?<port>\\d+)?");
+        final HttpHost[] httpHosts = new HttpHost[hosts.length];
+        for (int index=0; index < hosts.length; index++) {
+            final Matcher matcher = pattern.matcher(hosts[index].trim());
+            if (matcher.find()) {
+                final String scheme = matcher.group("scheme") != null ? matcher.group("scheme") : defaultScheme;
+                final String host = matcher.group("host");
+                final Integer port = matcher.group("port") != null ? Integer.valueOf(matcher.group("port")) : defaultPort;
+                httpHosts[index] = new HttpHost(host, port, scheme);
+                sslEnabled = sslEnabled || scheme != null && scheme.startsWith("https");
+            } else {
+                throw new IOException("Unable to parse host");
+            }
+        }
+
+        final RestClientBuilder builder = RestClient.builder(httpHosts);
+
         if (sslEnabled) {
             builder.setHttpClientConfigCallback(new RestClientBuilder.HttpClientConfigCallback() {
                 @Override
@@ -153,17 +187,7 @@ public class ElasticDataStoreFactory implements DataStoreFactorySpi {
             });
         }
 
-        final ElasticDataStore dataStore = new ElasticDataStore(builder.build(), indexName);
-       
-        dataStore.setDefaultMaxFeatures(getValue(DEFAULT_MAX_FEATURES, params));
-        dataStore.setSourceFilteringEnabled(getValue(SOURCE_FILTERING_ENABLED, params));
-        dataStore.setScrollEnabled(getValue(SCROLL_ENABLED, params));
-        dataStore.setScrollSize(((Number)getValue(SCROLL_SIZE, params)).longValue());
-        dataStore.setScrollTime(getValue(SCROLL_TIME_SECONDS, params));
-        dataStore.setArrayEncoding(ArrayEncoding.valueOf(arrayEncoding.toUpperCase()));
-        dataStore.setGridSize((Long) GRID_SIZE.lookUp(params));
-        dataStore.setGridThreshold((Double) GRID_THRESHOLD.lookUp(params));
-        return dataStore;
+        return builder.build();
     }
 
     @Override
