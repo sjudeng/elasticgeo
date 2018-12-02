@@ -146,7 +146,7 @@ public class ElasticDataStoreFactory implements DataStoreFactorySpi {
     }
 
     protected RestClient createRestClient(Map<String, Serializable> params) throws IOException {
-        final String[] hosts = (getValue(HOSTNAME, params)).split(",");
+        final String[] hosts = ((String) getValue(HOSTNAME, params)).split(",");
         final Integer defaultPort = getValue(HOSTPORT, params);
         Boolean sslEnabled = getValue(SSL_ENABLED, params);
         final Boolean sslRejectUnauthorized = getValue(SSL_REJECT_UNAUTHORIZED, params);

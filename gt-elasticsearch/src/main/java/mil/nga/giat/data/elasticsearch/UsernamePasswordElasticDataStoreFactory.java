@@ -87,8 +87,7 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
 		return PARAMS;
 	}
 
-	@Override
-	public DataStore createDataStore(Map<String, Serializable> params) throws IOException {
+    protected RestClient createRestClient(Map<String, Serializable> params) throws IOException {
 		final String searchHost = getValue(HOSTNAME, params);
 		final Integer hostPort = getValue(HOSTPORT, params);
 		final String indexName = (String) INDEX_NAME.lookUp(params);
@@ -167,16 +166,6 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
 			}
 		});
 
-		final ElasticDataStore dataStore;
-		dataStore = new ElasticDataStore(adminBuilder.build(), proxyBuilder.build(), indexName);
-		dataStore.setDefaultMaxFeatures(getValue(DEFAULT_MAX_FEATURES, params));
-		dataStore.setSourceFilteringEnabled(getValue(SOURCE_FILTERING_ENABLED, params));
-		dataStore.setScrollEnabled(getValue(SCROLL_ENABLED, params));
-		dataStore.setScrollSize(getValue(SCROLL_SIZE, params));
-		dataStore.setScrollTime(getValue(SCROLL_TIME_SECONDS, params));
-		dataStore.setArrayEncoding(ArrayEncoding.valueOf(arrayEncoding.toUpperCase()));
-		dataStore.setGridSize((Long) GRID_SIZE.lookUp(params));
-		dataStore.setGridThreshold((Double) GRID_THRESHOLD.lookUp(params));
-		return dataStore;
-	}
+        return adminBuilder.build();
+    }	
 }

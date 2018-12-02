@@ -14,7 +14,7 @@ public interface ElasticClient extends Closeable {
 
     static final String RUN_AS = "es-security-runas-user";
 	
-    public int getMajorVersion();
+    public double getVersion();
 
     public List<String> getTypes(String indexName) throws IOException;
 
