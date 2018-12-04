@@ -335,15 +335,15 @@ public abstract class ElasticConfigurationPage extends Panel {
                         return f;
                     } 
                 } else if (property == ElasticAttributeProvider.ORDER) {
-                	TextField<Integer> order = new TextField<Integer>("order", new PropertyModel<Integer>(itemModel, "order"));
-                	Fragment f = new Fragment(id, "textOrderValue", ElasticConfigurationPage.this);
-                	f.add(order);
-                	return f;
+                    TextField<Integer> order = new TextField<Integer>("order", new PropertyModel<Integer>(itemModel, "order"));
+                    Fragment f = new Fragment(id, "textOrderValue", ElasticConfigurationPage.this);
+                    f.add(order);
+                    return f;
                 } else if (property == ElasticAttributeProvider.CUSTOM_NAME) {
-                	TextField<String> customName = new TextField<String>("customName", new PropertyModel<String>(itemModel, "customName"));
-                	Fragment f = new Fragment(id, "textCustomNameValue", ElasticConfigurationPage.this);
-                	f.add(customName);
-                	return f;
+                    TextField<String> customName = new TextField<String>("customName", new PropertyModel<String>(itemModel, "customName"));
+                    Fragment f = new Fragment(id, "textCustomNameValue", ElasticConfigurationPage.this);
+                    f.add(customName);
+                    return f;
                 }
                 return null;
             }

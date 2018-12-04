@@ -196,7 +196,7 @@ public class ElasticDataStoreFactory implements DataStoreFactorySpi {
     }
 
     @SuppressWarnings({ "javadoc", "unchecked" })
-	protected static <T> T getValue(Param param, Map<String, Serializable> params) throws IOException {
+    protected static <T> T getValue(Param param, Map<String, Serializable> params) throws IOException {
         final Object value;
         if (param.lookUp(params) != null) {
             value = param.lookUp(params);

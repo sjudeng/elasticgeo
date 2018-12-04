@@ -15,8 +15,7 @@ import java.util.regex.Pattern;
  * the feature type and backend Elasticsearch queries.
  *
  */
-public class ElasticAttribute implements Serializable, 
-		Comparable<ElasticAttribute> {
+public class ElasticAttribute implements Serializable, Comparable<ElasticAttribute> {
 
     public enum ElasticGeometryType {
         GEO_POINT,
@@ -175,19 +174,19 @@ public class ElasticAttribute implements Serializable,
     }
     
     public void setOrder(Integer order) {
-    	this.order = order;
+        this.order = order;
     }
     
     public Integer getOrder() {
-    	return this.order;
+        return this.order;
     }
  
     public void setCustomName(String name) {
-    	this.customName = normalizeName(name);
+        this.customName = normalizeName(name);
     }
     
     public String getCustomName() {
-    	return this.customName;
+        return this.customName;
     }
     
     public String getDisplayName() {
@@ -229,6 +228,7 @@ public class ElasticAttribute implements Serializable,
         }
         return equal;
     }
+    
     /**
      * Implement comparison logic
      * @param o is a non-null ElasticAttribute
@@ -236,16 +236,16 @@ public class ElasticAttribute implements Serializable,
      */
     @Override
     public int compareTo(ElasticAttribute o) {
-     if(this.order == null) { 
-    	 if(o.order == null)
-    		 return this.name.compareTo(o.name);
-    	 return 1;
-     }
-     if(o.order == null)
-    	 return -1;
+        if(this.order == null) { 
+            if(o.order == null)
+                return this.name.compareTo(o.name);
+            return 1;
+        }
+        if(o.order == null)
+            return -1;
      
-     int i = this.order.compareTo(o.order);
-     return i == 0 ? this.name.compareTo(o.name) : i;
+        int i = this.order.compareTo(o.order);
+        return i == 0 ? this.name.compareTo(o.name) : i;
     }  
 
     /**
@@ -256,20 +256,20 @@ public class ElasticAttribute implements Serializable,
      * @return Name that is XML safe
      */
     private static String normalizeName (String name) {
-    	
-    	String normalName = name;
-    	
-    	/* XML element naming rules:
-    	 * 1. Element names must start with a letter or underscore
-    	 * 2. Element names cannot start with the letters xml
-    	 * 3. Element names cannot contain spaces
-    	 */
-    	if (normalName.toLowerCase().startsWith("xml")) {
-    		normalName = "_".concat(normalName);
-    	} else if (! beginLetters.matcher(normalName).matches()) {
-    		normalName = "_".concat(normalName);
-    	} 		
-    	/*	Simply replace all spaces in the name with "_". */   	
-    	return normalName.replaceAll(" ", "_");
+        
+        String normalName = name;
+        
+        /* XML element naming rules:
+         * 1. Element names must start with a letter or underscore
+         * 2. Element names cannot start with the letters xml
+         * 3. Element names cannot contain spaces
+         */
+        if (normalName.toLowerCase().startsWith("xml")) {
+            normalName = "_".concat(normalName);
+        } else if (! beginLetters.matcher(normalName).matches()) {
+            normalName = "_".concat(normalName);
+        }         
+        /* Simply replace all spaces in the name with "_". */
+        return normalName.replaceAll(" ", "_");
     }
 }

@@ -47,7 +47,7 @@ public class ElasticFeatureTypeBuilder extends SimpleFeatureTypeBuilder {
                 if (attribute.isUse()) {
                     final String attributeName;
                     if (attribute.getCustomName() != null) {
-                    	attributeName = attribute.getCustomName();
+                        attributeName = attribute.getCustomName();
                     } else if (attribute.getUseShortName()) {
                         attributeName = attribute.getShortName();
                     } else {

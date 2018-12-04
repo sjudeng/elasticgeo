@@ -80,8 +80,8 @@ public class ElasticDataStore extends ContentDataStore {
         CSV
     }
 
-    public ElasticDataStore(String searchHost, Integer hostPort,  String indexName) throws IOException {   	
-       this(RestClient.builder(new HttpHost(searchHost, hostPort, "http")).build(), indexName);
+    public ElasticDataStore(String searchHost, Integer hostPort,  String indexName) throws IOException {
+        this(RestClient.builder(new HttpHost(searchHost, hostPort, "http")).build(), indexName);
     }
 
     public ElasticDataStore(RestClient restClient, String indexName) throws IOException {
