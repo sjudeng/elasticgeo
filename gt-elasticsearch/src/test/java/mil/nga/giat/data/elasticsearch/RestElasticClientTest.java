@@ -58,9 +58,9 @@ public class RestElasticClientTest {
     private SecurityContext mockStx;
 
     @Before
-    public void setup() throws UnsupportedOperationException, IOException {    	
-    	mockRestClient = mock(RestClient.class);
-    	mockProxyRestClient = mock(RestClient.class);
+    public void setup() throws UnsupportedOperationException, IOException {
+        mockRestClient = mock(RestClient.class);
+        mockProxyRestClient = mock(RestClient.class);
         mockResponse = mock(Response.class);
         mockEntity = mock(HttpEntity.class);
         mockStatusLine = mock(StatusLine.class);
@@ -85,7 +85,7 @@ public class RestElasticClientTest {
 
     @Test
     public void testGetTypes() throws IOException {
-    	
+
         byte[] data = "{\"status_s\": {\"mappings\": {\"active\": {\"properties\": {\"status_s\": {\"type\": \"keyword\"}}}}}}".getBytes();
         InputStream inputStream = new ByteArrayInputStream(data);
         when(mockEntity.getContent()).thenReturn(inputStream);
@@ -246,7 +246,7 @@ public class RestElasticClientTest {
     
     @Test
     public void testSearchStoredFieldsWithProxyClient() throws IOException {
-    	ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
+        ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
         final Response mockResponse2 = mock(Response.class);
         final HttpEntity mockEntity2 = mock(HttpEntity.class);
         when(mockResponse2.getEntity()).thenReturn(mockEntity2);
@@ -276,7 +276,7 @@ public class RestElasticClientTest {
     @Test
     public void testSearchSortWithProxy() throws IOException {
         ArgumentMatcher<ByteArrayEntity> matcher = new JsonByteArrayEntityMatcher("{\"sort\":[{\"obj1\":{\"order\":\"asc\"}}]}".getBytes());
-    	ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
+        ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
         when(mockProxyRestClient.performRequest(eq("POST"), eq("/status_s/active/_search"), anyMap(), argThat(matcher), argThat(runAsHeaderMatcher))).thenReturn(mockResponse);
 
         ElasticRequest request = new ElasticRequest();
@@ -317,7 +317,7 @@ public class RestElasticClientTest {
     
     @Test
     public void testSearchResponseWithProxyClient() throws IOException {
-    	ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
+        ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
         InputStream inputStream = new ByteArrayInputStream("{\"hits\": {\"total\": 10, \"max_score\": 0.8, \"hits\": [{\"_index\": \"index_name\"}, {}]}}".getBytes());
         when(mockEntity.getContent()).thenReturn(inputStream);
         when(mockProxyRestClient.performRequest(eq("POST"), eq("/status_s/active/_search"), anyMap(), any(HttpEntity.class), argThat(runAsHeaderMatcher))).thenReturn(mockResponse);
@@ -338,7 +338,7 @@ public class RestElasticClientTest {
     
     @Test
     public void testQueryWithProxyClient() throws IOException {
-    	ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
+        ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
         final Map<String,Object> query = ImmutableMap.of("term", ImmutableMap.of("obj1", "value1"));
         final byte[] data = new ObjectMapper().writeValueAsBytes(ImmutableMap.of("query", query));
         ArgumentMatcher<ByteArrayEntity> matcher = new JsonByteArrayEntityMatcher(data);
@@ -361,7 +361,7 @@ public class RestElasticClientTest {
     
     @Test
     public void testAggregationWithProxyClient() throws IOException {
-    	ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
+        ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
         ArgumentMatcher<ByteArrayEntity> matcher = new JsonByteArrayEntityMatcher("{\"aggregations\":{\"ageohash_grid_agg\":{\"geohash_grid\": {\"field\":\"a_field\",\"precision\":1}}}}".getBytes());
         when(mockProxyRestClient.performRequest(eq("POST"), eq("/status_s/active/_search"), anyMap(), argThat(matcher), argThat(runAsHeaderMatcher))).thenReturn(mockResponse);
 
@@ -388,7 +388,7 @@ public class RestElasticClientTest {
     
     @Test
     public void testNextScrollWithProxyClient() throws IOException {
-    	ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
+        ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
         ArgumentMatcher<ByteArrayEntity> matcher = new JsonByteArrayEntityMatcher("{\"scroll_id\":\"id1\",\"scroll\":\"10s\"}".getBytes());
         when(mockProxyRestClient.performRequest(eq("POST"), eq("/_search/scroll"), anyMap(), argThat(matcher), argThat(runAsHeaderMatcher))).thenReturn(mockResponse);
 
@@ -405,7 +405,7 @@ public class RestElasticClientTest {
     
     @Test
     public void testClearScrollWithProxyClient() throws IOException {
-    	ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
+        ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
         ArgumentMatcher<ByteArrayEntity> matcher = new JsonByteArrayEntityMatcher("{\"scroll_id\":[\"id1\"]}".getBytes());
         when(mockProxyRestClient.performRequest(eq("DELETE"), eq("/_search/scroll"), anyMap(), argThat(matcher), argThat(runAsHeaderMatcher))).thenReturn(mockResponse);
 
@@ -462,20 +462,20 @@ public class RestElasticClientTest {
     }
     
     public class RunAsHeaderMatcher implements ArgumentMatcher<BasicHeader> {
-    	
-    	private static final String RUN_AS_HEADER_FIELD = "es-security-runas-user";
-    	private String runAsUser;
-    	
-    	public RunAsHeaderMatcher(String runAsUser) {
-    		this.runAsUser = runAsUser;
-    	}
+        
+        private static final String RUN_AS_HEADER_FIELD = "es-security-runas-user";
+        private String runAsUser;
+        
+        public RunAsHeaderMatcher(String runAsUser) {
+            this.runAsUser = runAsUser;
+        }
 
-		@Override
-		public boolean matches(BasicHeader header) {			
-			return RUN_AS_HEADER_FIELD.equals(header.getName()) 
-					&& runAsUser.equals(header.getValue());
-		}
-    	
+        @Override
+        public boolean matches(BasicHeader header) {
+            return RUN_AS_HEADER_FIELD.equals(header.getName()) 
+                    && runAsUser.equals(header.getValue());
+        }
+        
     }
 
     public class JsonByteArrayEntityMatcher implements ArgumentMatcher<ByteArrayEntity> {
