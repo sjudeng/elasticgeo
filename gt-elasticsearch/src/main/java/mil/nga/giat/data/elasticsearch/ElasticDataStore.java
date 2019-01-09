@@ -42,7 +42,7 @@ public class ElasticDataStore extends ContentDataStore {
     private final static Logger LOGGER = Logging.getLogger(ElasticDataStore.class);
 
     private ElasticClient client;
-   
+
     private final String indexName;
 
     private final List<Name> baseTypeNames;
@@ -102,8 +102,8 @@ public class ElasticDataStore extends ContentDataStore {
         } catch (Exception e) {
             throw new IOException("Unable to create REST client", e);
         }
-        LOGGER.fine("Created REST client: " + client);        
-        
+        LOGGER.fine("Created REST client: " + client);
+
         final List<String> types = getClient().getTypes(indexName);
         if (!types.isEmpty()) {
             baseTypeNames = types.stream().map(name -> new NameImpl(name)).collect(Collectors.toList());
@@ -116,7 +116,7 @@ public class ElasticDataStore extends ContentDataStore {
 
         arrayEncoding = ArrayEncoding.JSON;
     }
-    
+
     @Override
     protected List<Name> createTypeNames() {
         final List<Name> names = new ArrayList<>();
@@ -201,11 +201,6 @@ public class ElasticDataStore extends ContentDataStore {
 
     @Override
     public void dispose() {
-        try {
-            client.close();
-        } catch (IOException e) {
-            throw new RuntimeException("Error closing client", e);
-        }
         super.dispose();
     }
 

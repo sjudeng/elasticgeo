@@ -85,7 +85,6 @@ public class RestElasticClientTest {
 
     @Test
     public void testGetTypes() throws IOException {
-
         byte[] data = "{\"status_s\": {\"mappings\": {\"active\": {\"properties\": {\"status_s\": {\"type\": \"keyword\"}}}}}}".getBytes();
         InputStream inputStream = new ByteArrayInputStream(data);
         when(mockEntity.getContent()).thenReturn(inputStream);
@@ -94,7 +93,6 @@ public class RestElasticClientTest {
         List<String> names = client.getTypes("status_s");
         assertEquals(1, names.size());
         assertEquals("active", names.get(0));
-        
     }
     
     @Test

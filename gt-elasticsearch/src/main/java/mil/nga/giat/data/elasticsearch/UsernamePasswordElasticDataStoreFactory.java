@@ -2,6 +2,11 @@ package mil.nga.giat.data.elasticsearch;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -9,12 +14,15 @@ import java.util.logging.Logger;
 
 import mil.nga.giat.data.elasticsearch.ElasticDataStore.ArrayEncoding;
 
+import org.apache.commons.codec.binary.Base32;
 import org.apache.http.HttpHost;
+import org.apache.http.StatusLine;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
+import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestClientBuilder.HttpClientConfigCallback;
@@ -28,6 +36,8 @@ import org.geotools.util.logging.Logging;
 
 public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFactory
 {
+    /** Charset for converting bytes to String */
+    private static final Charset UTF8 = Charset.forName("utf-8");
 
     /** The logger for this class */
     protected final static Logger LOGGER = Logging.getLogger(UsernamePasswordElasticDataStoreFactory.class);
@@ -52,22 +62,25 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
 
     /** All the parameters for this data store */
     protected static final Param[] PARAMS = {
-        HOSTNAME,
-        HOSTPORT,
-        INDEX_NAME,
-        DEFAULT_MAX_FEATURES,
+        HOSTNAME, 
+        HOSTPORT, 
+        INDEX_NAME, 
+        DEFAULT_MAX_FEATURES, 
         ADMIN_USER,
-        ADMIN_PASSWD,  
-        PROXY_USER,
-        PROXY_PASSWD,         
-        SOURCE_FILTERING_ENABLED,
-        SCROLL_ENABLED,
+        ADMIN_PASSWD, 
+        PROXY_USER, 
+        PROXY_PASSWD, 
+        SOURCE_FILTERING_ENABLED, 
+        SCROLL_ENABLED, 
         SCROLL_SIZE,
-        SCROLL_TIME_SECONDS,
-        ARRAY_ENCODING,
-        GRID_SIZE,
-        GRID_THRESHOLD
+        SCROLL_TIME_SECONDS, 
+        ARRAY_ENCODING, 
+        GRID_SIZE, 
+        GRID_THRESHOLD 
     };
+
+    /** All the RestClients used by this factory */
+    private static final Map<String, RestClient> clients = new HashMap<>();
 
     /** Counter of HTTP threads we generate */
     protected static final AtomicInteger httpThreads = new AtomicInteger(1);
@@ -87,47 +100,156 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
         return PARAMS;
     }
 
-    protected RestClient createRestClient(Map<String, Serializable> params) throws IOException {
-        final String searchHost = getValue(HOSTNAME, params);
-        final Integer hostPort = getValue(HOSTPORT, params);
+    @Override
+    public DataStore createDataStore(Map<String, Serializable> params) throws IOException {
+
         final String indexName = (String) INDEX_NAME.lookUp(params);
         final String arrayEncoding = getValue(ARRAY_ENCODING, params);
 
-        String[] nodes = searchHost.split(",");
+        final ElasticDataStore dataStore;
+        dataStore = new ElasticDataStore(getAdminClient(params), getProxyClient(params), indexName);
+        dataStore.setDefaultMaxFeatures(getValue(DEFAULT_MAX_FEATURES, params));
+        dataStore.setSourceFilteringEnabled(getValue(SOURCE_FILTERING_ENABLED, params));
+        dataStore.setScrollEnabled(getValue(SCROLL_ENABLED, params));
+        dataStore.setScrollSize(getValue(SCROLL_SIZE, params));
+        dataStore.setScrollTime(getValue(SCROLL_TIME_SECONDS, params));
+        dataStore.setArrayEncoding(ArrayEncoding.valueOf(arrayEncoding.toUpperCase()));
+        dataStore.setGridSize((Long) GRID_SIZE.lookUp(params));
+        dataStore.setGridThreshold((Double) GRID_THRESHOLD.lookUp(params));
+        return dataStore;
+    }
+
+    /**
+     * Get the Admin Client.
+     * 
+     * @param params Map of String to Serializable
+     * @return RestClient
+     * @throws IOException when the client can't be created
+     */
+    private static RestClient getAdminClient(Map<String, Serializable> params) throws IOException {
+
+        final String type = "ADMIN";
+        final String key = key(type, params);
+
+        final String host = getValue(HOSTNAME, params);
+        final Integer port = getValue(HOSTPORT, params);
+        final String user = getValue(ADMIN_USER, params);
+        final String password = getValue(ADMIN_PASSWD, params);
+
+        return getClient(type, key, host, port, user, password);
+    }
+
+    /**
+     * Get the Proxy Client.
+     * 
+     * @param params Map of String to Serializable
+     * @return RestClient
+     * @throws IOException when the client can't be created
+     */
+    private static RestClient getProxyClient(Map<String, Serializable> params) throws IOException {
+
+        final String type = "PROXY";
+        final String key = key(type, params);
+
+        final String host = getValue(HOSTNAME, params);
+        final Integer port = getValue(HOSTPORT, params);
+        final String user = getValue(PROXY_USER, params);
+        final String password = getValue(PROXY_PASSWD, params);
+
+        return getClient(type, key, host, port, user, password);
+    }
+
+    /**
+     * Get the Client.
+     * @param type String
+     * @param key  String
+     * @param host  String
+     * @param port Integer
+     * @param user  String
+     * @param password  String
+     * 
+     * @return RestClient
+     * @throws IOException when the client can't be created
+     */
+    @SuppressWarnings("resource")
+    private static RestClient getClient(String type, String key, String host, Integer port, String user, String password)
+            throws IOException {
+
+        RestClient client = null;
+        if (clients.containsKey(key))
+            client = clients.get(key);
+
+        if (client == null) {
+            synchronized (clients) {
+                if (clients.containsKey(key))
+                    client = clients.get(key);
+
+                if (client == null) {
+                    client = buildClient(type, host, port, user, password);
+                    clients.put(key, client);
+                }
+            }
+        }
+        try {
+            final StatusLine sl = client.performRequest("GET", "/", Collections.emptyMap()).getStatusLine();
+            if (sl.getStatusCode() >= 400)
+                throw new IOException(String.format("Connection Test %d: %s", sl.getStatusCode(), sl.getReasonPhrase()));
+        } catch (Exception e) {
+            LOGGER.info(String.format("Removing %s:%s connection due to: %s", type, user, e.getMessage()));
+            clients.remove(key);
+            return getClient(type, key, host, port, user, password);
+        }
+
+        return client;
+    }
+
+    /**
+     * Build a RestClient.
+     * 
+     * @param type String descriptor of this client purpose ADMIN|PROXY
+     * @param searchHost String csv of hosts
+     * @param hostPort Integer
+     * @param user String
+     * @param password String
+     * @return RestClient
+     * @throws IOException when the client can't be created
+     */
+    private static RestClient buildClient(String type, String searchHost, Integer hostPort, String user, String password)
+            throws IOException {
+
+        final String[] nodes = searchHost.split(",");
         final AuthScope[] auths = new AuthScope[nodes.length];
         final HttpHost[] hosts = new HttpHost[nodes.length];
 
         for (int i = 0; i < nodes.length; i++) {
-            String node = nodes[i];
+            final String node = nodes[i];
             auths[i] = new AuthScope(node, hostPort);
             hosts[i] = new HttpHost(node, hostPort, "https");
         }
 
-        final RestClientBuilder adminBuilder = RestClient.builder(hosts);
-        final RestClientBuilder proxyBuilder = RestClient.builder(hosts);
+        final RestClientBuilder builder = RestClient.builder(hosts);
 
-        final String adminUser = getValue(ADMIN_USER, params);
-        final String adminPasswd = getValue(ADMIN_PASSWD, params);
-        adminBuilder.setRequestConfigCallback((b) -> {
-            LOGGER.fine("Calling Admin setRequestConfigCallback");
+        builder.setRequestConfigCallback((b) -> {
+            LOGGER.fine(String.format("Calling %s setRequestConfigCallback", type));
             return b.setAuthenticationEnabled(true);
         });
-        adminBuilder.setHttpClientConfigCallback(new HttpClientConfigCallback() {
+
+        builder.setHttpClientConfigCallback(new HttpClientConfigCallback() {
             @Override
             public HttpAsyncClientBuilder customizeHttpClient(HttpAsyncClientBuilder httpClientBuilder) {
-                LOGGER.fine("Calling Admin customizeHttpClient");
+                LOGGER.fine(String.format("Calling %s customizeHttpClient", type));
                 httpClientBuilder.setThreadFactory(new ThreadFactory() {
                     @Override
                     public Thread newThread(Runnable run) {
                         Thread t = new Thread(run);
                         t.setDaemon(true);
-                        t.setName(String.format("esrest-asynchttp-admin-%d", httpThreads.getAndIncrement()));
+                        t.setName(String.format("esrest-asynchttp-%s-%d", type, httpThreads.getAndIncrement()));
                         return t;
                     }
                 });
                 httpClientBuilder.useSystemProperties();
-                CredentialsProvider cp = new BasicCredentialsProvider();
-                Credentials creds = new org.apache.http.auth.UsernamePasswordCredentials(adminUser, adminPasswd);
+                final CredentialsProvider cp = new BasicCredentialsProvider();
+                final Credentials creds = new org.apache.http.auth.UsernamePasswordCredentials(user, password);
                 for (AuthScope scope : auths)
                     cp.setCredentials(scope, creds);
 
@@ -136,36 +258,36 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
             }
         });
 
-        final String proxyUser = getValue(PROXY_USER, params);
-        final String proxyPasswd = getValue(PROXY_PASSWD, params);
-        proxyBuilder.setRequestConfigCallback((b) -> {
-            LOGGER.fine("Calling Proxy setRequestConfigCallback");
-            return b.setAuthenticationEnabled(true);
-        });
-        proxyBuilder.setHttpClientConfigCallback(new HttpClientConfigCallback() {
-            @Override
-            public HttpAsyncClientBuilder customizeHttpClient(HttpAsyncClientBuilder httpClientBuilder) {
-                LOGGER.fine("Calling Proxy customizeHttpClient");
-                httpClientBuilder.setThreadFactory(new ThreadFactory() {
-                    @Override
-                    public Thread newThread(Runnable run) {
-                        Thread t = new Thread(run);
-                        t.setDaemon(true);
-                        t.setName(String.format("esrest-asynchttp-proxy-%d", httpThreads.getAndIncrement()));
-                        return t;
-                    }
-                });
-                httpClientBuilder.useSystemProperties();
-                CredentialsProvider cp = new BasicCredentialsProvider();
-                Credentials creds = new org.apache.http.auth.UsernamePasswordCredentials(proxyUser, proxyPasswd);
-                for (AuthScope scope : auths)
-                    cp.setCredentials(scope, creds);
+        LOGGER.info(String.format("Building a %s RestClient for %s @ %s:%d", type, user, searchHost, hostPort));
+        return builder.build();
+    }
 
-                httpClientBuilder.setDefaultCredentialsProvider(cp);
-                return httpClientBuilder;
-            }
-        });
+    /**
+     * Get the digest key of the type and host, port and users.
+     * 
+     * @param type String
+     * @param params Map of String to Serializable
+     * @return String
+     * @throws IOException when needed params can't be read.
+     */
+    private static String key(String type, Map<String, Serializable> params) throws IOException {
+        MessageDigest md;
+        try {
+            md = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IOException("Could not get MD5 Digest!", e);
+        }
 
-        return adminBuilder.build();
+        md.update(type.getBytes(UTF8));
+        String host = getValue(HOSTNAME, params);
+        md.update(host.getBytes(UTF8));
+        Integer port = getValue(HOSTPORT, params);
+        md.update(port.byteValue());
+        String admin = getValue(ADMIN_USER, params);
+        md.update(admin.getBytes(UTF8));
+        String proxy = getValue(PROXY_USER, params);
+        md.update(proxy.getBytes(UTF8));
+
+        return new Base32().encodeAsString(md.digest());
     }
 }

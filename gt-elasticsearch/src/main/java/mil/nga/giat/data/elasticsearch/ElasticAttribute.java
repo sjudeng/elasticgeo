@@ -61,7 +61,7 @@ public class ElasticAttribute implements Serializable, Comparable<ElasticAttribu
         this.defaultGeometry = false;
         this.useShortName = false;
         this.stored = false;
-        this.nested = false;        
+        this.nested = false;
     }
 
     public ElasticAttribute(ElasticAttribute other) {
