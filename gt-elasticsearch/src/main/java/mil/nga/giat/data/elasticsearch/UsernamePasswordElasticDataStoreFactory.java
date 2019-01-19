@@ -1,3 +1,7 @@
+/**
+ * This file is hereby placed into the Public Domain. This means anyone is
+ * free to do whatever they wish with this file.
+ */
 package mil.nga.giat.data.elasticsearch;
 
 import java.io.IOException;
@@ -33,9 +37,8 @@ import org.geotools.util.logging.Logging;
  * Data store factory that creates {@linkplain ElasticDataStore} instances.
  *
  */
-
-public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFactory
-{
+public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFactory {
+    
     /** Charset for converting bytes to String */
     private static final Charset UTF8 = Charset.forName("utf-8");
 

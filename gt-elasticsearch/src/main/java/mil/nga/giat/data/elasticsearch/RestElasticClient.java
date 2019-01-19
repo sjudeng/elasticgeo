@@ -62,7 +62,7 @@ public class RestElasticClient implements ElasticClient {
         this.adminClient = client;
         this.mapper = new ObjectMapper();
         this.mapper.setDateFormat(DATE_FORMAT);
-    } 
+    }
 
     public RestElasticClient(RestClient client, RestClient proxyClient) {
         this.adminClient = client;
@@ -154,7 +154,6 @@ public class RestElasticClient implements ElasticClient {
 
     @Override
     public ElasticResponse search(String searchIndices, String type, ElasticRequest request) throws IOException {
-  
         final StringBuilder pathBuilder = new StringBuilder("/" + searchIndices + "/" + type + "/_search");
 
         final Map<String,Object> requestBody = new HashMap<>();
@@ -198,15 +197,11 @@ public class RestElasticClient implements ElasticClient {
         if (LOGGER.isLoggable(Level.FINE)) {
             LOGGER.fine("Elasticsearch request:\n" + this.mapper.writerWithDefaultPrettyPrinter().writeValueAsString(requestBody));
         }
-        
-        if (this.proxyClient != null) {
-            return parseResponse(performRequest("POST", pathBuilder.toString(), requestBody, this.proxyClient));
-        }
-        return parseResponse(performRequest("POST", pathBuilder.toString(), requestBody, this.adminClient));      
-    }
-   
-    Response performRequest(String method, String path, Map<String,Object> requestBody, RestClient rc) throws IOException {
 
+        return parseResponse(performRequest("POST", pathBuilder.toString(), requestBody));
+    }
+
+    Response performRequest(String method, String path, Map<String,Object> requestBody, RestClient rc) throws IOException {
         final byte[] data = this.mapper.writeValueAsBytes(requestBody);
         final HttpEntity entity = new ByteArrayEntity(data, ContentType.APPLICATION_JSON);
         if (LOGGER.isLoggable(Level.FINE)) {
@@ -214,30 +209,34 @@ public class RestElasticClient implements ElasticClient {
             LOGGER.fine("Path: " + path);
             LOGGER.fine("RequestBody: " + requestBody);
         }
-        
-        Header proxy = null;
+
         Response response = null;
         if (rc == this.proxyClient) {
-            SecurityContext ctx = SecurityContextHolder.getContext();
-            Authentication auth = ctx.getAuthentication();
-            if (auth == null)
+            final SecurityContext ctx = SecurityContextHolder.getContext();
+            final Authentication auth = ctx.getAuthentication();
+            if (auth == null) {
                 throw new IllegalStateException(String.format("Authentication could not be determined!"));
-            if (!auth.isAuthenticated())
+            }
+            if (!auth.isAuthenticated()) {
                 throw new IllegalStateException(String.format("User is not authenticated: %s", auth.getName()));
-
-            proxy = new BasicHeader(RUN_AS, auth.getName());
+            }
+            final Header proxy = new BasicHeader(RUN_AS, auth.getName());
             LOGGER.fine("Performing proxy request for: " + auth.getName());
             response = rc.performRequest(method, path, Collections.<String, String> emptyMap(), entity, proxy);
         } else {
             LOGGER.fine("Performing admin request.");
             response = rc.performRequest(method, path, Collections.<String, String> emptyMap(), entity);
         }
-        if (response.getStatusLine().getStatusCode() >= 400)
+        if (response.getStatusLine().getStatusCode() >= 400) {
             throw new IOException("Error executing request: " + response.getStatusLine().getReasonPhrase());
-
+        }
         return response;
     }
 
+    Response performRequest(String method, String path, Map<String,Object> requestBody) throws IOException {
+        return performRequest(method, path, requestBody, this.proxyClient != null ? this.proxyClient : this.adminClient);
+    }
+    
     private ElasticResponse parseResponse(final Response response) throws IOException {
         try (final InputStream inputStream = response.getEntity().getContent()) {
             return this.mapper.readValue(inputStream, ElasticResponse.class);
@@ -246,16 +245,12 @@ public class RestElasticClient implements ElasticClient {
 
     @Override
     public ElasticResponse scroll(String scrollId, Integer scrollTime) throws IOException {
-        
         final String path = "/_search/scroll";
 
         final Map<String,Object> requestBody = new HashMap<>();
         requestBody.put("scroll_id", scrollId);
         requestBody.put("scroll", scrollTime + "s");
-        if (this.proxyClient != null) {
-            return parseResponse(performRequest("POST", path, requestBody, this.proxyClient));
-        }
-        return parseResponse(performRequest("POST", path, requestBody, this.adminClient));
+        return parseResponse(performRequest("POST", path, requestBody));
     }
 
     @Override
@@ -264,11 +259,7 @@ public class RestElasticClient implements ElasticClient {
         if (!scrollIds.isEmpty()) {
             final Map<String,Object> requestBody = new HashMap<>();
             requestBody.put("scroll_id", scrollIds);
-            if (this.proxyClient != null) {
-                performRequest("DELETE", path, requestBody, this.proxyClient);
-            } else {
-                performRequest("DELETE", path, requestBody, this.adminClient);
-            }
+            performRequest("DELETE", path, requestBody);
         }
     }
 
@@ -298,7 +289,7 @@ public class RestElasticClient implements ElasticClient {
             }
         }
     }
-    
+
     private Set<String> getIndices(String alias) {
         Set<String> indices = null;
         try {

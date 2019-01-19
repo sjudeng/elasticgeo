@@ -40,7 +40,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 public class RestElasticClientTest {
 
     private RestClient mockRestClient;
-    
+
     private RestClient mockProxyRestClient;
 
     private Response mockResponse;
@@ -50,11 +50,11 @@ public class RestElasticClientTest {
     private StatusLine mockStatusLine;
 
     private RestElasticClient client;
-    
+
     private RestElasticClient clientWithProxy;
-    
+
     private Authentication mockAuth;
-    
+
     private SecurityContext mockStx;
 
     @Before
@@ -66,16 +66,16 @@ public class RestElasticClientTest {
         mockStatusLine = mock(StatusLine.class);
         mockAuth = mock(Authentication.class);
         mockStx = mock(SecurityContext.class);
-        
+
         when(mockResponse.getEntity()).thenReturn(mockEntity);
         when(mockResponse.getStatusLine()).thenReturn(mockStatusLine);       
         when(mockStatusLine.getStatusCode()).thenReturn(200);
-        
+
         when(mockStx.getAuthentication()).thenReturn(mockAuth);
         when(mockAuth.isAuthenticated()).thenReturn(true);
         when(mockAuth.getName()).thenReturn("runAsTest");
         SecurityContextHolder.setContext(mockStx);
-        
+
         client = new RestElasticClient(mockRestClient);
         clientWithProxy = new RestElasticClient(mockRestClient, mockProxyRestClient);
 
@@ -94,7 +94,7 @@ public class RestElasticClientTest {
         assertEquals(1, names.size());
         assertEquals("active", names.get(0));
     }
-    
+
     @Test
     public void testGetMapping() throws IOException {
         byte[] data = "{\"status_s\": {\"mappings\": {\"active\": {\"properties\": {\"status_s\": {\"type\": \"keyword\"}}}}}}".getBytes();
@@ -126,7 +126,7 @@ public class RestElasticClientTest {
         request.setSize(10);
         client.search("status_s", "active", request);
     }
-    
+
     @Test
     public void testSearchSizeWithProxyClient() throws IOException {
         ArgumentMatcher<ByteArrayEntity> matcher = new JsonByteArrayEntityMatcher("{\"size\":10}".getBytes());
@@ -147,7 +147,7 @@ public class RestElasticClientTest {
         request.setFrom(10);
         client.search("status_s", "active", request);
     }
-    
+
     @Test
     public void testSearchFromWithProxyClient() throws IOException {
         ArgumentMatcher<ByteArrayEntity> matcher = new JsonByteArrayEntityMatcher("{\"from\":10}".getBytes());
@@ -168,7 +168,7 @@ public class RestElasticClientTest {
         request.setScroll(10);
         client.search("status_s", "active", request);
     }
-    
+
     @Test
     public void testSearchScrollWithProxyClient() throws IOException {
         ArgumentMatcher<ByteArrayEntity> matcher = new JsonByteArrayEntityMatcher("{}".getBytes());
@@ -189,7 +189,7 @@ public class RestElasticClientTest {
         request.addSourceInclude("obj1");
         client.search("status_s", "active", request);
     }
-    
+
     @Test
     public void testSearchSourceFilteringWithProxyClient() throws IOException {
         ArgumentMatcher<ByteArrayEntity> matcher = new JsonByteArrayEntityMatcher("{\"_source\":\"obj1\"}".getBytes());
@@ -211,7 +211,7 @@ public class RestElasticClientTest {
         request.addSourceInclude("obj2");
         client.search("status_s", "active", request);
     }
-    
+
     @Test
     public void testSearchSourceFiltering2WithProxyClient() throws IOException {
         ArgumentMatcher<ByteArrayEntity> matcher = new JsonByteArrayEntityMatcher("{\"_source\":[\"obj1\",\"obj2\"]}".getBytes());
@@ -241,7 +241,7 @@ public class RestElasticClientTest {
         request.addField("obj1");
         client.search("status_s", "active", request);
     }
-    
+
     @Test
     public void testSearchStoredFieldsWithProxyClient() throws IOException {
         ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
@@ -270,7 +270,7 @@ public class RestElasticClientTest {
         request.addSort("obj1", "asc");
         client.search("status_s", "active", request);
     }
-    
+
     @Test
     public void testSearchSortWithProxy() throws IOException {
         ArgumentMatcher<ByteArrayEntity> matcher = new JsonByteArrayEntityMatcher("{\"sort\":[{\"obj1\":{\"order\":\"asc\"}}]}".getBytes());
@@ -292,7 +292,7 @@ public class RestElasticClientTest {
         request.addSort("obj2", "desc");
         client.search("status_s", "active", request);
     }
-    
+
     @Test
     public void testSearchSort2WithProxyClient() throws IOException {
         ArgumentMatcher<ByteArrayEntity> matcher = new JsonByteArrayEntityMatcher("{\"sort\":[{\"obj1\":{\"order\":\"asc\"}},{\"obj2\":{\"order\":\"desc\"}}]}".getBytes());
@@ -312,7 +312,7 @@ public class RestElasticClientTest {
         when(mockRestClient.performRequest(eq("POST"), eq("/status_s/active/_search"), anyMap(), any(HttpEntity.class))).thenReturn(mockResponse);
         client.search("status_s", "active", new ElasticRequest());
     }
-    
+
     @Test
     public void testSearchResponseWithProxyClient() throws IOException {
         ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
@@ -333,7 +333,7 @@ public class RestElasticClientTest {
         request.setQuery(query);
         client.search("status_s", "active", request);
     }
-    
+
     @Test
     public void testQueryWithProxyClient() throws IOException {
         ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
@@ -356,7 +356,7 @@ public class RestElasticClientTest {
         request.setAggregations(ImmutableMap.of("ageohash_grid_agg", ImmutableMap.of("geohash_grid", ImmutableMap.of("field","a_field","precision",1))));
         client.search("status_s", "active", request);
     }
-    
+
     @Test
     public void testAggregationWithProxyClient() throws IOException {
         ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
@@ -383,7 +383,7 @@ public class RestElasticClientTest {
 
         client.scroll("id1", 10);
     }
-    
+
     @Test
     public void testNextScrollWithProxyClient() throws IOException {
         ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
@@ -400,7 +400,7 @@ public class RestElasticClientTest {
 
         client.clearScroll(ImmutableSet.of("id1"));
     }
-    
+
     @Test
     public void testClearScrollWithProxyClient() throws IOException {
         ArgumentMatcher<BasicHeader> runAsHeaderMatcher = new RunAsHeaderMatcher("runAsTest");
@@ -409,13 +409,12 @@ public class RestElasticClientTest {
 
         clientWithProxy.clearScroll(ImmutableSet.of("id1"));
     }
-    
+
     @Test
     public void testClose() throws IOException {
         client.close();
         verify(mockRestClient).close();
     }  
-    
 
     @Test
     public void testProxyClose() throws IOException {
@@ -458,9 +457,9 @@ public class RestElasticClientTest {
         }
         return data;
     }
-    
+
     public class RunAsHeaderMatcher implements ArgumentMatcher<BasicHeader> {
-        
+
         private static final String RUN_AS_HEADER_FIELD = "es-security-runas-user";
         private String runAsUser;
         
@@ -473,7 +472,7 @@ public class RestElasticClientTest {
             return RUN_AS_HEADER_FIELD.equals(header.getName()) 
                     && runAsUser.equals(header.getValue());
         }
-        
+
     }
 
     public class JsonByteArrayEntityMatcher implements ArgumentMatcher<ByteArrayEntity> {
