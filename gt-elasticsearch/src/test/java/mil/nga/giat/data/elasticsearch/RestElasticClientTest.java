@@ -68,7 +68,7 @@ public class RestElasticClientTest {
         mockStx = mock(SecurityContext.class);
 
         when(mockResponse.getEntity()).thenReturn(mockEntity);
-        when(mockResponse.getStatusLine()).thenReturn(mockStatusLine);       
+        when(mockResponse.getStatusLine()).thenReturn(mockStatusLine);
         when(mockStatusLine.getStatusCode()).thenReturn(200);
 
         when(mockStx.getAuthentication()).thenReturn(mockAuth);

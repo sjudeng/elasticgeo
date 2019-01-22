@@ -236,14 +236,12 @@ public class ElasticAttribute implements Serializable, Comparable<ElasticAttribu
      */
     @Override
     public int compareTo(ElasticAttribute o) {
-        if(this.order == null) { 
-            if(o.order == null)
-                return this.name.compareTo(o.name);
-            return 1;
+        if (this.order == null) {
+            return o.order == null ? this.name.compareTo(o.name) : 1;
         }
-        if(o.order == null)
+        if (o.order == null) {
             return -1;
-     
+        }
         int i = this.order.compareTo(o.order);
         return i == 0 ? this.name.compareTo(o.name) : i;
     }  

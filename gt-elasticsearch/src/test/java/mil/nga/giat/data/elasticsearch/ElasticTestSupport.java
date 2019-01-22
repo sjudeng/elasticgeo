@@ -109,7 +109,7 @@ public class ElasticTestSupport {
 
     @After
     public void afterTest() throws Exception {
-        client.performRequest("DELETE", "/" + indexName, null, RestClient.builder(new HttpHost("localhost", PORT, "http")).build());
+        client.performRequest("DELETE", "/" + indexName, null);
         dataStore.dispose();
         client.close();
     }
@@ -133,11 +133,11 @@ public class ElasticTestSupport {
             Map<String,Object> source = mapReader.readValue(s.next());
             mappings.put(TYPE_NAME, source);
         }
-        client.performRequest("PUT", "/" + indexName, settings, RestClient.builder(new HttpHost("localhost", PORT, "http")).build());
+        client.performRequest("PUT", "/" + indexName, settings);
 
         // add alias
         Map<String,Object> aliases = ImmutableMap.of("actions", ImmutableList.of(ImmutableMap.of("index", indexName, "alias", indexName + "_alias")));
-        client.performRequest("PUT", "/_alias", aliases, RestClient.builder(new HttpHost("localhost", PORT, "http")).build());
+        client.performRequest("PUT", "/_alias", aliases);
     }
 
     private void indexDocuments(String status) throws IOException {
@@ -156,11 +156,11 @@ public class ElasticTestSupport {
             for (final Map<String,Object> featureSource : features) {
                 if (featureSource.containsKey("status_s") && featureSource.get("status_s").equals(status)) {
                     final String id = featureSource.containsKey("id") ? (String) featureSource.get("id") : null;
-                    client.performRequest("POST", "/" + indexName + "/" + TYPE_NAME + "/" + id, featureSource, RestClient.builder(new HttpHost("localhost", PORT, "http")).build());
+                    client.performRequest("POST", "/" + indexName + "/" + TYPE_NAME + "/" + id, featureSource);
                 }
             }
 
-            client.performRequest("POST", "/" + indexName + "/_refresh", null, RestClient.builder(new HttpHost("localhost", PORT, "http")).build());
+            client.performRequest("POST", "/" + indexName + "/_refresh", null);
         }
     }
 
