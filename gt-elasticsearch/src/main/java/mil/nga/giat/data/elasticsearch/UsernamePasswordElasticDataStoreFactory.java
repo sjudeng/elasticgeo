@@ -139,7 +139,7 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
         final String user = getValue(ADMIN_USER, params);
         final String password = getValue(ADMIN_PASSWD, params);
 
-        return getClient(type, key, host, port, user, password);
+        return getClient(type, key, host, port, user, password, true);
     }
 
     /**
@@ -159,7 +159,7 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
         final String user = getValue(PROXY_USER, params);
         final String password = getValue(PROXY_PASSWD, params);
 
-        return getClient(type, key, host, port, user, password);
+        return getClient(type, key, host, port, user, password, true);
     }
 
     /**
@@ -170,12 +170,13 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
      * @param port Integer
      * @param user  String
      * @param password  String
+     * @param retry boolean
      * 
      * @return RestClient
      * @throws IOException when the client can't be created
      */
     @SuppressWarnings("resource")
-    private static RestClient getClient(String type, String key, String host, Integer port, String user, String password)
+    private static RestClient getClient(String type, String key, String host, Integer port, String user, String password, boolean retry)
             throws IOException {
 
         RestClient client = null;
@@ -200,7 +201,15 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
         } catch (Exception e) {
             LOGGER.info(String.format("Removing %s:%s connection due to: %s", type, user, e.getMessage()));
             clients.remove(key);
-            return getClient(type, key, host, port, user, password);
+            try {
+                client.close();
+            } catch (Exception e2) {
+                LOGGER.warning(String.format("Failed to close %s:%s connection due to: %s", type, user, e2.getMessage()));
+            }
+            if (retry)
+                return getClient(type, key, host, port, user, password, false);
+            throw new IOException(String.format("Multiple connection attempts failed for %s RestClient to %s @ %s:%d ", 
+                    type, user, host, port));
         }
 
         return client;
