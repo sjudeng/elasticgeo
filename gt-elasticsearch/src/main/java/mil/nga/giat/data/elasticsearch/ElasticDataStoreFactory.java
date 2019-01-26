@@ -130,10 +130,14 @@ public class ElasticDataStoreFactory implements DataStoreFactorySpi {
 
     @Override
     public DataStore createDataStore(Map<String, Serializable> params) throws IOException {
+        return createDataStore(createRestClient(params), null, params);
+    }
+
+    protected DataStore createDataStore(RestClient adminClient, RestClient proxyClient, Map<String, Serializable> params) throws IOException {
         final String indexName = (String) INDEX_NAME.lookUp(params);
         final String arrayEncoding = getValue(ARRAY_ENCODING, params);
 
-        final ElasticDataStore dataStore = new ElasticDataStore(createRestClient(params), indexName);
+        final ElasticDataStore dataStore = new ElasticDataStore(adminClient, proxyClient, indexName);
         dataStore.setDefaultMaxFeatures(getValue(DEFAULT_MAX_FEATURES, params));
         dataStore.setSourceFilteringEnabled(getValue(SOURCE_FILTERING_ENABLED, params));
         dataStore.setScrollEnabled(getValue(SCROLL_ENABLED, params));

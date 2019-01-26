@@ -12,11 +12,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
-
-import mil.nga.giat.data.elasticsearch.ElasticDataStore.ArrayEncoding;
 
 import org.apache.commons.codec.binary.Base32;
 import org.apache.http.HttpHost;
@@ -25,11 +22,8 @@ import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
-import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
-import org.elasticsearch.client.RestClientBuilder.HttpClientConfigCallback;
 import org.geotools.data.DataStore;
 import org.geotools.util.logging.Logging;
 
@@ -105,31 +99,17 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
 
     @Override
     public DataStore createDataStore(Map<String, Serializable> params) throws IOException {
-
-        final String indexName = (String) INDEX_NAME.lookUp(params);
-        final String arrayEncoding = getValue(ARRAY_ENCODING, params);
-
-        final ElasticDataStore dataStore;
-        dataStore = new ElasticDataStore(getAdminClient(params), getProxyClient(params), indexName);
-        dataStore.setDefaultMaxFeatures(getValue(DEFAULT_MAX_FEATURES, params));
-        dataStore.setSourceFilteringEnabled(getValue(SOURCE_FILTERING_ENABLED, params));
-        dataStore.setScrollEnabled(getValue(SCROLL_ENABLED, params));
-        dataStore.setScrollSize(getValue(SCROLL_SIZE, params));
-        dataStore.setScrollTime(getValue(SCROLL_TIME_SECONDS, params));
-        dataStore.setArrayEncoding(ArrayEncoding.valueOf(arrayEncoding.toUpperCase()));
-        dataStore.setGridSize((Long) GRID_SIZE.lookUp(params));
-        dataStore.setGridThreshold((Double) GRID_THRESHOLD.lookUp(params));
-        return dataStore;
+        return createDataStore(getAdminClient(params), getProxyClient(params), params);
     }
 
     /**
      * Get the Admin Client.
-     * 
+     *
      * @param params Map of String to Serializable
      * @return RestClient
      * @throws IOException when the client can't be created
      */
-    private static RestClient getAdminClient(Map<String, Serializable> params) throws IOException {
+    private RestClient getAdminClient(Map<String, Serializable> params) throws IOException {
 
         final String type = "ADMIN";
         final String key = key(type, params);
@@ -144,12 +124,12 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
 
     /**
      * Get the Proxy Client.
-     * 
+     *
      * @param params Map of String to Serializable
      * @return RestClient
      * @throws IOException when the client can't be created
      */
-    private static RestClient getProxyClient(Map<String, Serializable> params) throws IOException {
+    private RestClient getProxyClient(Map<String, Serializable> params) throws IOException {
 
         final String type = "PROXY";
         final String key = key(type, params);
@@ -176,17 +156,19 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
      * @throws IOException when the client can't be created
      */
     @SuppressWarnings("resource")
-    private static RestClient getClient(String type, String key, String host, Integer port, String user, String password, boolean retry)
+    private RestClient getClient(String type, String key, String host, Integer port, String user, String password, boolean retry)
             throws IOException {
 
         RestClient client = null;
-        if (clients.containsKey(key))
+        if (clients.containsKey(key)) {
             client = clients.get(key);
+        }
 
         if (client == null) {
             synchronized (clients) {
-                if (clients.containsKey(key))
+                if (clients.containsKey(key)) {
                     client = clients.get(key);
+                }
 
                 if (client == null) {
                     client = buildClient(type, host, port, user, password);
@@ -196,8 +178,9 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
         }
         try {
             final StatusLine sl = client.performRequest("GET", "/", Collections.emptyMap()).getStatusLine();
-            if (sl.getStatusCode() >= 400)
+            if (sl.getStatusCode() >= 400) {
                 throw new IOException(String.format("Connection Test %d: %s", sl.getStatusCode(), sl.getReasonPhrase()));
+            }
         } catch (Exception e) {
             LOGGER.info(String.format("Removing %s:%s connection due to: %s", type, user, e.getMessage()));
             clients.remove(key);
@@ -206,8 +189,9 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
             } catch (Exception e2) {
                 LOGGER.warning(String.format("Failed to close %s:%s connection due to: %s", type, user, e2.getMessage()));
             }
-            if (retry)
+            if (retry) {
                 return getClient(type, key, host, port, user, password, false);
+            }
             throw new IOException(String.format("Multiple connection attempts failed for %s RestClient to %s @ %s:%d ", 
                     type, user, host, port));
         }
@@ -226,9 +210,7 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
      * @return RestClient
      * @throws IOException when the client can't be created
      */
-    private static RestClient buildClient(String type, String searchHost, Integer hostPort, String user, String password)
-            throws IOException {
-
+    private RestClient buildClient(String type, String searchHost, Integer hostPort, String user, String password) {
         final String[] nodes = searchHost.split(",");
         final AuthScope[] auths = new AuthScope[nodes.length];
         final HttpHost[] hosts = new HttpHost[nodes.length];
@@ -239,39 +221,38 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
             hosts[i] = new HttpHost(node, hostPort, "https");
         }
 
-        final RestClientBuilder builder = RestClient.builder(hosts);
+        final RestClientBuilder builder = createClientBuilder(hosts);
 
         builder.setRequestConfigCallback((b) -> {
             LOGGER.fine(String.format("Calling %s setRequestConfigCallback", type));
             return b.setAuthenticationEnabled(true);
         });
 
-        builder.setHttpClientConfigCallback(new HttpClientConfigCallback() {
-            @Override
-            public HttpAsyncClientBuilder customizeHttpClient(HttpAsyncClientBuilder httpClientBuilder) {
-                LOGGER.fine(String.format("Calling %s customizeHttpClient", type));
-                httpClientBuilder.setThreadFactory(new ThreadFactory() {
-                    @Override
-                    public Thread newThread(Runnable run) {
-                        Thread t = new Thread(run);
-                        t.setDaemon(true);
-                        t.setName(String.format("esrest-asynchttp-%s-%d", type, httpThreads.getAndIncrement()));
-                        return t;
-                    }
-                });
-                httpClientBuilder.useSystemProperties();
-                final CredentialsProvider cp = new BasicCredentialsProvider();
-                final Credentials creds = new org.apache.http.auth.UsernamePasswordCredentials(user, password);
-                for (AuthScope scope : auths)
-                    cp.setCredentials(scope, creds);
-
-                httpClientBuilder.setDefaultCredentialsProvider(cp);
-                return httpClientBuilder;
+        builder.setHttpClientConfigCallback((httpClientBuilder) -> {
+            LOGGER.fine(String.format("Calling %s customizeHttpClient", type));
+            httpClientBuilder.setThreadFactory((run) -> {
+                final Thread thread = new Thread(run);
+                thread.setDaemon(true);
+                thread.setName(String.format("esrest-asynchttp-%s-%d", type, httpThreads.getAndIncrement()));
+                return thread;
+            });
+            httpClientBuilder.useSystemProperties();
+            final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+            final Credentials credentials = new org.apache.http.auth.UsernamePasswordCredentials(user, password);
+            for (AuthScope scope : auths) {
+                credentialsProvider.setCredentials(scope, credentials);
             }
+
+            httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
+            return httpClientBuilder;
         });
 
         LOGGER.info(String.format("Building a %s RestClient for %s @ %s:%d", type, user, searchHost, hostPort));
         return builder.build();
+    }
+
+    protected RestClientBuilder createClientBuilder(HttpHost[] hosts) {
+        return RestClient.builder(hosts);
     }
 
     /**
@@ -283,7 +264,7 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
      * @throws IOException when needed params can't be read.
      */
     private static String key(String type, Map<String, Serializable> params) throws IOException {
-        MessageDigest md;
+        final MessageDigest md;
         try {
             md = MessageDigest.getInstance("MD5");
         } catch (NoSuchAlgorithmException e) {
@@ -301,5 +282,9 @@ public class UsernamePasswordElasticDataStoreFactory extends ElasticDataStoreFac
         md.update(proxy.getBytes(UTF8));
 
         return new Base32().encodeAsString(md.digest());
+    }
+
+    protected static Map<String, RestClient> getClients() {
+        return clients;
     }
 }
